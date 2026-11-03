@@ -323,7 +323,23 @@ async function startMediaRecorder() {
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         audioChunks = [];
-        mediaRecorder = new MediaRecorder(stream);
+        
+        let options = {};
+        let ext = 'webm';
+        if (typeof MediaRecorder.isTypeSupported === 'function') {
+            if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+                options = { mimeType: 'audio/webm;codecs=opus' };
+                ext = 'webm';
+            } else if (MediaRecorder.isTypeSupported('audio/webm')) {
+                options = { mimeType: 'audio/webm' };
+                ext = 'webm';
+            } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+                options = { mimeType: 'audio/mp4' };
+                ext = 'mp4';
+            }
+        }
+
+        mediaRecorder = new MediaRecorder(stream, options);
 
         mediaRecorder.ondataavailable = (e) => {
             if (e.data && e.data.size > 0) audioChunks.push(e.data);
@@ -333,11 +349,11 @@ async function startMediaRecorder() {
             stream.getTracks().forEach(t => t.stop());
             if (audioChunks.length === 0) return;
 
-            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+            const audioBlob = new Blob(audioChunks, { type: options.mimeType || 'audio/webm' });
             updateStatus('Transcribing speech (Whisper)...', 'busy');
 
             const formData = new FormData();
-            formData.append('audio', audioBlob, 'recording.webm');
+            formData.append('audio', audioBlob, `recording.${ext}`);
 
             try {
                 const res = await fetch('/api/stt', { method: 'POST', body: formData });
