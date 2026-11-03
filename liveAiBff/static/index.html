@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI BFF - Real-Time Live Voice</title>
+    <title>AI BFF - Real-Time Live Talk</title>
     <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
@@ -19,12 +19,12 @@
             </div>
         </header>
 
-        <!-- Persona Configuration Chips -->
+        <!-- Persona Configuration Selectors -->
         <section class="persona-selector">
             <div class="selector-group">
                 <div class="selector-header">
                     <label class="group-label">Archetype</label>
-                    <span class="persona-hint">Dark Soul · Trickster · Soother</span>
+                    <span class="persona-hint" id="activeArchetypeLabel">Dark Soul</span>
                 </div>
                 <div class="chip-row" id="archetypeChips">
                     <button type="button" class="chip active" data-archetype="DarkSoul">Dark Soul</button>
@@ -36,45 +36,47 @@
             <div class="selector-group">
                 <div class="selector-header">
                     <label class="group-label">Personality Modifier</label>
-                    <span class="persona-hint">Delulu · Online · Villain · Unbothered</span>
+                    <span class="persona-hint" id="activeAttitudeLabel">Delulu</span>
                 </div>
                 <div class="chip-row" id="attitudeChips">
                     <button type="button" class="chip active" data-attitude="Delulu">Delulu</button>
-                    <button type="button" class="chip" data-attitude="ChronicallyOnline">Chronically Online</button>
+                    <button type="button" class="chip" data-attitude="ChronicallyOnline">Online</button>
                     <button type="button" class="chip" data-attitude="VillainEra">Villain Era</button>
                     <button type="button" class="chip" data-attitude="Unbothered">Unbothered</button>
                 </div>
             </div>
 
             <div class="selector-group compact">
-                <label class="group-label">Voice Gender</label>
+                <label class="group-label">Voice</label>
                 <div class="chip-row" id="genderChips">
-                    <button type="button" class="chip active" data-gender="M">Male (Adam/Liam)</button>
-                    <button type="button" class="chip" data-gender="F">Female (Jessica/Laura)</button>
+                    <button type="button" class="chip active" data-gender="M">M</button>
+                    <button type="button" class="chip" data-gender="F">F</button>
                 </div>
             </div>
         </section>
 
-        <!-- Central Live Voice Visualizer & Stage Card -->
+        <!-- Main Live Voice Card -->
         <main class="voice-stage">
-            <!-- Dynamic Voice Orb Canvas -->
-            <div class="orb-container">
-                <canvas id="visualizerCanvas" width="300" height="300"></canvas>
-                <div class="orb-overlay">
-                    <span class="emotion-badge" id="activeEmotion">READY</span>
-                    <span class="live-indicator" id="liveIndicator">HANDS-FREE VAD</span>
+            <!-- Pulsing State Display -->
+            <div class="state-circle-container">
+                <div class="state-circle" id="stateCircle">
+                    <div class="pulse-ring" id="pulseRing"></div>
+                    <div class="circle-inner">
+                        <span class="circle-icon" id="circleIcon">🎙️</span>
+                        <span class="circle-label" id="circleLabel">TAP TO TALK</span>
+                    </div>
                 </div>
             </div>
 
-            <!-- Real-Time Subtitle & Karaoke Card -->
+            <!-- Dialogue Subtitle Card -->
             <div class="dialogue-card" id="dialogueCard">
                 <div class="card-meta">
                     <span class="speaker-tag" id="activeSpeaker">AI BFF</span>
-                    <span class="turn-timing" id="turnTiming"></span>
+                    <span class="emotion-badge" id="activeEmotion">READY</span>
                 </div>
                 <div class="user-bubble" id="userBubble" style="display: none;"></div>
                 <div class="karaoke-text" id="karaokeContainer">
-                    Tap <strong>Start Live Call</strong> below to speak freely.
+                    Tap the microphone button or Start Call to talk.
                 </div>
             </div>
         </main>
@@ -82,33 +84,43 @@
         <!-- Hidden Audio Player for Low-Latency Playback -->
         <audio id="audioPlayer" preload="auto"></audio>
 
-        <!-- Voice Call Controls -->
+        <!-- Live Voice Controls -->
         <footer class="app-footer">
-            <!-- Primary Live Call Button -->
-            <button type="button" id="callToggleBtn" class="call-toggle-btn idle">
-                <span class="call-icon">
-                    <svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28">
-                        <path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56a.977.977 0 00-1.01.24l-2.2 2.2a15.05 15.05 0 01-6.59-6.59l2.2-2.21a.96.96 0 00.25-1.01A11.36 11.36 0 018.57 3.9c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1 0 9.39 7.61 17 17 17 .55 0 1-.45 1-1v-3.52c0-.55-.45-1-.99-1z"/>
-                    </svg>
-                </span>
-                <span class="call-text" id="callBtnText">START LIVE CALL</span>
-            </button>
+            <!-- Live Action Row -->
+            <div class="action-buttons-row">
+                <!-- Push to Talk Mic Button -->
+                <button type="button" id="micBtn" class="big-mic-btn" aria-label="Tap to speak">
+                    <span class="mic-svg-icon">
+                        <svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28">
+                            <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+                            <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+                        </svg>
+                    </span>
+                    <span id="micButtonText">TAP TO SPEAK</span>
+                </button>
 
-            <!-- Secondary Controls Row (Barge-in Stop + Text Toggle) -->
+                <!-- Hands-Free Call Mode Toggle -->
+                <button type="button" id="callModeBtn" class="call-mode-btn" title="Toggle hands-free conversation">
+                    <span class="call-mode-icon">📞</span>
+                    <span id="callModeLabel">AUTO CALL</span>
+                </button>
+            </div>
+
+            <!-- Control Actions (Stop / Text Mode) -->
             <div class="secondary-controls">
                 <button type="button" id="stopBtn" class="pill-btn stop-audio-btn">■ Interrupt / Stop</button>
                 <button type="button" id="textToggleBtn" class="pill-btn secondary-btn">⌨ Text Mode</button>
             </div>
 
-            <!-- Collapsible Secondary Text Bar -->
+            <!-- Collapsible Text Input Bar -->
             <div class="collapsible-text-bar" id="textBar" style="display: none;">
                 <input type="text" id="textInput" placeholder="Type a message..." autocomplete="off">
                 <button type="button" id="sendBtn" class="send-button">➤</button>
             </div>
 
-            <!-- Quick Trigger Chips for Stage Rehearsal -->
+            <!-- Quick Stage Prompts -->
             <div class="quick-prompts-container">
-                <span class="quick-label">PROMPTS:</span>
+                <span class="quick-label">QUICK TEST:</span>
                 <div class="quick-chips">
                     <button type="button" class="quick-chip" data-prompt="Bestie, I think I failed my exam today.">💀 Failed Exam</button>
                     <button type="button" class="quick-chip" data-prompt="Should I text my ex right now?">📱 Text Ex?</button>
