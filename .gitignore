@@ -1,0 +1,35 @@
+# Environment and secrets
+.env
+*.env
+11labs_API_KEY.txt
+*.key
+
+# Virtual environments
+venv/
+*/venv/
+.venv/
+*/.venv/
+ENV/
+env/
+
+# Python bytecode & cache
+__pycache__/
+*/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Generated runtime audio files
+liveAiBff/audio/*.mp3
+liveAiBff/audio/*.wav
+audio/
+
+# Cloned reference code
+reference/
+
+# OS / Editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log

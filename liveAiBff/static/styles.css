@@ -1,0 +1,378 @@
+:root {
+    --bg-primary: #0a0b0f;
+    --bg-secondary: #12141c;
+    --bg-card: #181b26;
+    --accent-cyan: #00f0ff;
+    --accent-purple: #9d4edd;
+    --accent-pink: #ff2a85;
+    --accent-red: #ff3b30;
+    --accent-green: #00e676;
+    --text-primary: #f0f3f6;
+    --text-secondary: #8b949e;
+    --border-color: #262b3d;
+    --radius-md: 12px;
+    --radius-lg: 18px;
+    --radius-full: 9999px;
+    --font-stack: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    -webkit-tap-highlight-color: transparent;
+}
+
+body {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: var(--font-stack);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: stretch;
+    overflow-x: hidden;
+}
+
+.app-container {
+    width: 100%;
+    max-width: 480px;
+    display: flex;
+    flex-direction: column;
+    padding: 16px;
+    min-height: 100vh;
+    gap: 14px;
+}
+
+/* Header */
+.app-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 4px;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.status-indicator {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background-color: #ff9800;
+    transition: background-color 0.3s ease;
+}
+
+.status-indicator.connected {
+    background-color: var(--accent-green);
+    box-shadow: 0 0 8px rgba(0, 230, 118, 0.6);
+}
+
+.status-indicator.busy {
+    background-color: var(--accent-cyan);
+    animation: pulse 1s infinite alternate;
+}
+
+.status-indicator.error {
+    background-color: var(--accent-red);
+}
+
+.status-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.pill-btn {
+    border: none;
+    outline: none;
+    padding: 6px 14px;
+    border-radius: var(--radius-full);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+    transition: all 0.2s;
+}
+
+.pill-btn:hover {
+    color: var(--text-primary);
+    border-color: var(--text-secondary);
+}
+
+.pill-btn.danger {
+    color: #ff6b6b;
+    border-color: rgba(255, 107, 107, 0.3);
+}
+
+.pill-btn.danger:hover {
+    background: rgba(255, 107, 107, 0.15);
+}
+
+/* Persona Selectors */
+.persona-selector {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.selector-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.group-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+}
+
+.chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.chip {
+    border: 1px solid var(--border-color);
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    padding: 6px 12px;
+    border-radius: var(--radius-full);
+    font-size: 0.82rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.chip:hover {
+    border-color: var(--accent-cyan);
+    color: var(--text-primary);
+}
+
+.chip.active {
+    background: linear-gradient(135deg, rgba(0, 240, 255, 0.15), rgba(157, 78, 221, 0.25));
+    border-color: var(--accent-cyan);
+    color: var(--accent-cyan);
+    box-shadow: 0 0 10px rgba(0, 240, 255, 0.2);
+}
+
+/* Dialogue Screen */
+.dialogue-screen {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 16px;
+    min-height: 180px;
+    position: relative;
+    overflow: hidden;
+}
+
+.dialogue-card {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    height: 100%;
+}
+
+.card-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.speaker-tag {
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--accent-purple);
+}
+
+.emotion-badge {
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: var(--radius-full);
+    background: rgba(0, 240, 255, 0.1);
+    color: var(--accent-cyan);
+    border: 1px solid rgba(0, 240, 255, 0.3);
+    text-transform: uppercase;
+}
+
+.emotion-badge.villainous {
+    background: rgba(255, 42, 133, 0.15);
+    color: var(--accent-pink);
+    border-color: var(--accent-pink);
+}
+
+.emotion-badge.sarcastic, .emotion-badge.smirk {
+    background: rgba(255, 152, 0, 0.15);
+    color: #ff9800;
+    border-color: #ff9800;
+}
+
+.emotion-badge.comforting {
+    background: rgba(0, 230, 118, 0.15);
+    color: var(--accent-green);
+    border-color: var(--accent-green);
+}
+
+.karaoke-text {
+    font-size: 1.15rem;
+    line-height: 1.5;
+    color: var(--text-primary);
+    overflow-y: auto;
+    max-height: 220px;
+    word-wrap: break-word;
+}
+
+.karaoke-word {
+    display: inline-block;
+    transition: color 0.1s ease, text-shadow 0.1s ease;
+    margin-right: 4px;
+}
+
+.karaoke-word.active {
+    color: var(--accent-cyan);
+    font-weight: 700;
+    text-shadow: 0 0 12px rgba(0, 240, 255, 0.8);
+    transform: scale(1.05);
+}
+
+/* Footer & Mic Controls */
+.app-footer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding-bottom: 8px;
+}
+
+.mic-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    width: 100%;
+}
+
+.mic-button {
+    width: 84px;
+    height: 84px;
+    border-radius: 50%;
+    border: none;
+    outline: none;
+    background: linear-gradient(135deg, #202638, #131722);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    color: var(--accent-cyan);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    border: 2px solid rgba(0, 240, 255, 0.4);
+}
+
+.mic-button:hover {
+    transform: scale(1.05);
+    border-color: var(--accent-cyan);
+    box-shadow: 0 0 20px rgba(0, 240, 255, 0.4);
+}
+
+.mic-button.recording {
+    background: linear-gradient(135deg, #ff2a85, #d90429);
+    border-color: #ff3b30;
+    color: #fff;
+    transform: scale(1.1);
+    box-shadow: 0 0 28px rgba(255, 42, 133, 0.8);
+    animation: micPulse 1.2s infinite;
+}
+
+.mic-icon {
+    width: 32px;
+    height: 32px;
+}
+
+.mic-label {
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    margin-top: 2px;
+}
+
+.stop-audio-btn {
+    border-color: rgba(255, 107, 107, 0.4);
+    color: #ff8585;
+}
+
+/* Fallback Text Input */
+.text-input-form {
+    display: flex;
+    width: 100%;
+    gap: 8px;
+}
+
+.text-input-form input {
+    flex: 1;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-full);
+    padding: 10px 16px;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.text-input-form input:focus {
+    border-color: var(--accent-cyan);
+}
+
+.send-button {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    border: none;
+    background: var(--accent-cyan);
+    color: #000;
+    font-weight: bold;
+    font-size: 1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s;
+}
+
+.send-button:hover {
+    transform: scale(1.08);
+}
+
+@keyframes pulse {
+    0% { opacity: 0.4; }
+    100% { opacity: 1; }
+}
+
+@keyframes micPulse {
+    0% { box-shadow: 0 0 0 0 rgba(255, 42, 133, 0.7); }
+    70% { box-shadow: 0 0 0 16px rgba(255, 42, 133, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(255, 42, 133, 0); }
+}

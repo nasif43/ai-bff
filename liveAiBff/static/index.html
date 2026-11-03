@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AI BFF Live Stage Controller</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-left">
+                <span class="status-indicator" id="statusDot"></span>
+                <span class="status-title" id="statusText">Connecting...</span>
+            </div>
+            <div class="header-right">
+                <button id="resetBtn" class="pill-btn danger" title="Clear conversation memory">Reset</button>
+            </div>
+        </header>
+
+        <!-- Persona Configuration Selectors -->
+        <section class="persona-selector">
+            <!-- Archetype -->
+            <div class="selector-group">
+                <label class="group-label">Archetype</label>
+                <div class="chip-row" id="archetypeChips">
+                    <button class="chip active" data-archetype="DarkSoul">Dark Soul</button>
+                    <button class="chip" data-archetype="Trickster">Trickster</button>
+                    <button class="chip" data-archetype="Soother">Soother</button>
+                </div>
+            </div>
+
+            <!-- Attitude Modifier -->
+            <div class="selector-group">
+                <label class="group-label">Personality Modifier</label>
+                <div class="chip-row" id="attitudeChips">
+                    <button class="chip active" data-attitude="Delulu">Delulu</button>
+                    <button class="chip" data-attitude="ChronicallyOnline">Online</button>
+                    <button class="chip" data-attitude="VillainEra">Villain Era</button>
+                    <button class="chip" data-attitude="Unbothered">Unbothered</button>
+                </div>
+            </div>
+
+            <!-- Voice Gender -->
+            <div class="selector-group">
+                <label class="group-label">Voice</label>
+                <div class="chip-row" id="genderChips">
+                    <button class="chip active" data-gender="M">M</button>
+                    <button class="chip" data-gender="F">F</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Live Interaction Screen / Dialogue Feed -->
+        <section class="dialogue-screen" id="dialogueScreen">
+            <div class="dialogue-card" id="activeCard">
+                <div class="card-meta">
+                    <span class="speaker-tag" id="activeSpeaker">AI BFF</span>
+                    <span class="emotion-badge" id="activeEmotion">ready</span>
+                </div>
+                <div class="karaoke-text" id="karaokeContainer">
+                    Tap the mic below and talk to start.
+                </div>
+            </div>
+        </section>
+
+        <!-- Hidden Audio Element -->
+        <audio id="audioPlayer" preload="auto"></audio>
+
+        <!-- Live Controls -->
+        <footer class="app-footer">
+            <div class="mic-container">
+                <button id="micBtn" class="mic-button" aria-label="Hold to talk or tap to speak">
+                    <svg class="mic-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                        <line x1="12" x2="12" y1="19" y2="22"/>
+                    </svg>
+                    <span class="mic-label">HOLD OR TAP</span>
+                </button>
+                <button id="stopBtn" class="pill-btn stop-audio-btn" title="Stop Audio">■ Stop</button>
+            </div>
+
+            <!-- Manual input fallback -->
+            <form id="textForm" class="text-input-form" onsubmit="return false;">
+                <input type="text" id="textInput" placeholder="Type a message instead..." autocomplete="off">
+                <button type="submit" id="sendBtn" class="send-button">➤</button>
+            </form>
+        </footer>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
