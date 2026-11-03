@@ -69,6 +69,16 @@ class GroqEngine:
         # Normalize whitespace
         text = re.sub(r"\s+", " ", text).strip()
 
+        # Safety fallback: if all content was stripped by bracket regex
+        if not text:
+            fallback = EMOTION_TAG_PATTERN.sub("", raw_text).strip()
+            fallback = re.sub(r"[\*\[\]\(\)]", " ", fallback)
+            fallback = EMOJI_PATTERN.sub(" ", fallback)
+            text = re.sub(r"\s+", " ", fallback).strip()
+
+        if not text:
+            text = "I hear you, Shihab. Tell me more."
+
         return text, emotion
 
     def generate_turn(

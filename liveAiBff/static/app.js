@@ -1,4 +1,4 @@
-// AI BFF - Voice Interaction Engine
+// AI BFF - Voice Interaction Engine with Web Audio API Loudspeaker Playback
 let ws = null;
 let recognition = null;
 let mediaRecorder = null;
@@ -11,6 +11,12 @@ let audioUnlocked = false;
 let karaokeAnimFrame = null;
 let currentTimestamps = [];
 let wordElements = [];
+
+// Web Audio API Context
+let audioCtx = null;
+let currentSourceNode = null;
+let audioPlayStartTime = 0;
+let currentAudioBuffer = null;
 
 // Configuration State
 let currentConfig = {
@@ -42,16 +48,33 @@ const sendBtn = document.getElementById('sendBtn');
 const resetBtn = document.getElementById('resetBtn');
 
 // ----------------------------------------------------
-// 1. AUDIO UNLOCKING (Overcomes Browser Autoplay Restrictions)
+// 1. WEB AUDIO API INITIALIZATION & UNLOCKING
 // ----------------------------------------------------
+function getAudioContext() {
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+    }
+    return audioCtx;
+}
+
 function unlockAudio() {
-    if (audioUnlocked) return;
-    audioPlayer.play().then(() => {
-        audioPlayer.pause();
-        audioPlayer.currentTime = 0;
-        audioUnlocked = true;
-        console.log('[Audio] Browser audio context unlocked');
-    }).catch(() => {});
+    const ctx = getAudioContext();
+    if (ctx.state === 'suspended') {
+        ctx.resume();
+    }
+    // Also unlock standard HTML audio element
+    if (!audioUnlocked) {
+        audioPlayer.volume = 1.0;
+        audioPlayer.play().then(() => {
+            audioPlayer.pause();
+            audioPlayer.currentTime = 0;
+            audioUnlocked = true;
+            console.log('[Audio] Unlocked both WebAudio and HTML5 audio');
+        }).catch(() => {});
+    }
 }
 document.addEventListener('click', unlockAudio, { once: false });
 document.addEventListener('touchstart', unlockAudio, { once: false });
@@ -150,9 +173,10 @@ function handleServerEvent(data) {
 }
 
 // ----------------------------------------------------
-// 3. PLAYBACK & SUBTITLE KARAOKE
+// 3. LOW-LATENCY AUDIO PLAYBACK & VISUAL SYNC
 // ----------------------------------------------------
-function playTurn(turn) {
+async function playTurn(turn) {
+    unlockAudio();
     isAiSpeaking = true;
     setState('speaking', '🔊', 'BFF SPEAKING');
     updateStatus('BFF Speaking...', 'connected');
@@ -177,35 +201,74 @@ function playTurn(turn) {
         karaokeContainer.textContent = turn.text;
     }
 
+    // Attempt 1: Web Audio API (Loudspeaker, zero-latency, bypasses iOS silent switch issues)
+    const ctx = getAudioContext();
+    try {
+        const response = await fetch(turn.audio_url);
+        const arrayBuffer = await response.arrayBuffer();
+        const buffer = await ctx.decodeAudioData(arrayBuffer);
+        currentAudioBuffer = buffer;
+
+        if (currentSourceNode) {
+            try { currentSourceNode.stop(); } catch(e){}
+        }
+
+        const source = ctx.createBufferSource();
+        source.buffer = buffer;
+        source.connect(ctx.destination);
+        currentSourceNode = source;
+
+        audioPlayStartTime = ctx.currentTime;
+        source.start(0);
+        console.log('[Audio] Playing via Web Audio API');
+
+        // Karaoke sync loop using AudioContext time
+        cancelAnimationFrame(karaokeAnimFrame);
+        syncWebAudioKaraoke(ctx);
+
+        source.onended = () => {
+            onAudioPlaybackEnded();
+        };
+
+        return;
+    } catch (e) {
+        console.warn('[WebAudio] fallback to HTML5 audio:', e);
+    }
+
+    // Attempt 2: HTML5 Audio fallback
     audioPlayer.src = turn.audio_url;
     audioPlayer.currentTime = 0;
+    audioPlayer.volume = 1.0;
 
     const playPromise = audioPlayer.play();
     if (playPromise !== undefined) {
         playPromise.then(() => {
             cancelAnimationFrame(karaokeAnimFrame);
-            syncKaraoke();
+            syncHtmlAudioKaraoke();
         }).catch(e => {
-            console.warn('Autoplay caught:', e);
-            const listenBtn = document.createElement('button');
-            listenBtn.type = 'button';
-            listenBtn.className = 'pill-btn';
-            listenBtn.style.marginTop = '8px';
-            listenBtn.style.borderColor = 'var(--accent-cyan)';
-            listenBtn.style.color = 'var(--accent-cyan)';
-            listenBtn.innerHTML = '▶ Click to Listen';
-            listenBtn.onclick = () => {
-                audioPlayer.play();
-                listenBtn.remove();
-                syncKaraoke();
-            };
-            karaokeContainer.appendChild(document.createElement('br'));
-            karaokeContainer.appendChild(listenBtn);
+            console.warn('[HTML5Audio] Autoplay blocked, rendering play button:', e);
+            renderManualPlayButton(turn.audio_url);
         });
     }
 }
 
-function syncKaraoke() {
+function syncWebAudioKaraoke(ctx) {
+    if (isAiSpeaking && currentSourceNode) {
+        const elapsed = ctx.currentTime - audioPlayStartTime;
+        for (let i = 0; i < currentTimestamps.length; i++) {
+            const t = currentTimestamps[i];
+            const el = wordElements[i];
+            if (elapsed >= t.start && elapsed <= t.end + 0.05) {
+                el.classList.add('active');
+            } else {
+                el.classList.remove('active');
+            }
+        }
+        karaokeAnimFrame = requestAnimationFrame(() => syncWebAudioKaraoke(ctx));
+    }
+}
+
+function syncHtmlAudioKaraoke() {
     if (!audioPlayer.paused && !audioPlayer.ended) {
         const curTime = audioPlayer.currentTime;
         for (let i = 0; i < currentTimestamps.length; i++) {
@@ -217,13 +280,31 @@ function syncKaraoke() {
                 el.classList.remove('active');
             }
         }
-        karaokeAnimFrame = requestAnimationFrame(syncKaraoke);
-    } else {
-        wordElements.forEach(el => el.classList.remove('active'));
+        karaokeAnimFrame = requestAnimationFrame(syncHtmlAudioKaraoke);
     }
 }
 
-audioPlayer.addEventListener('ended', () => {
+function renderManualPlayButton(audioUrl) {
+    const listenBtn = document.createElement('button');
+    listenBtn.type = 'button';
+    listenBtn.className = 'pill-btn';
+    listenBtn.style.marginTop = '10px';
+    listenBtn.style.borderColor = 'var(--accent-cyan)';
+    listenBtn.style.color = 'var(--accent-cyan)';
+    listenBtn.style.fontWeight = 'bold';
+    listenBtn.innerHTML = '🔊 Tap to Hear BFF Voice';
+    listenBtn.onclick = () => {
+        unlockAudio();
+        audioPlayer.src = audioUrl;
+        audioPlayer.play();
+        listenBtn.remove();
+        syncHtmlAudioKaraoke();
+    };
+    karaokeContainer.appendChild(document.createElement('br'));
+    karaokeContainer.appendChild(listenBtn);
+}
+
+function onAudioPlaybackEnded() {
     isAiSpeaking = false;
     cancelAnimationFrame(karaokeAnimFrame);
     wordElements.forEach(el => el.classList.remove('active'));
@@ -235,10 +316,16 @@ audioPlayer.addEventListener('ended', () => {
         setState('idle', '🎙️', 'TAP TO TALK');
         updateStatus('Ready', 'connected');
     }
-});
+}
+
+audioPlayer.addEventListener('ended', onAudioPlaybackEnded);
 
 function stopPlayback() {
     isAiSpeaking = false;
+    if (currentSourceNode) {
+        try { currentSourceNode.stop(); } catch(e){}
+        currentSourceNode = null;
+    }
     audioPlayer.pause();
     audioPlayer.currentTime = 0;
     cancelAnimationFrame(karaokeAnimFrame);
@@ -268,6 +355,10 @@ function renderUserSpeech(text) {
 function sendTurnText(text) {
     const trimmed = text.trim();
     if (!trimmed) return;
+
+    // Immediately stop microphone to restore mobile speaker to full media volume
+    stopVoiceCapture();
+
     renderUserSpeech(trimmed);
     setState('thinking', '⚡', 'THINKING...');
     updateStatus('BFF Thinking...', 'busy');
@@ -277,7 +368,7 @@ function sendTurnText(text) {
 }
 
 // ----------------------------------------------------
-// 4. SPEECH RECOGNITION & RECORDING
+// 4. SPEECH CAPTURE (WebSpeech + MediaRecorder Whisper)
 // ----------------------------------------------------
 function startVoiceCapture() {
     unlockAudio();
@@ -308,7 +399,7 @@ function startVoiceCapture() {
                 setState('listening', '🎤', 'LISTENING...');
                 updateStatus('Listening to you... Speak now', 'busy');
                 micBtn.classList.add('recording');
-                micButtonText.textContent = 'LISTENING... (TAP TO STOP)';
+                micButtonText.textContent = 'LISTENING... (TAP TO SEND)';
             };
 
             recognition.onresult = (event) => {
@@ -320,7 +411,6 @@ function startVoiceCapture() {
 
             recognition.onerror = (event) => {
                 console.warn('[WebSpeech] error:', event.error);
-                // Fall back to MediaRecorder on error
                 if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
                     startMediaRecorderCapture();
                 } else {
@@ -335,7 +425,7 @@ function startVoiceCapture() {
             recognition.start();
             return;
         } catch (e) {
-            console.warn('[WebSpeech] exception, trying MediaRecorder:', e);
+            console.warn('[WebSpeech] failed, falling back:', e);
         }
     }
 
@@ -375,7 +465,10 @@ async function startMediaRecorderCapture() {
         };
 
         mediaRecorder.onstop = async () => {
-            if (audioStream) audioStream.getTracks().forEach(t => t.stop());
+            if (audioStream) {
+                audioStream.getTracks().forEach(t => t.stop());
+                audioStream = null;
+            }
             if (recordedChunks.length === 0) return;
 
             const audioBlob = new Blob(recordedChunks, { type: options.mimeType || 'audio/webm' });
@@ -422,6 +515,10 @@ function stopVoiceCapture() {
     }
     if (mediaRecorder && mediaRecorder.state !== 'inactive') {
         try { mediaRecorder.stop(); } catch(e){}
+    }
+    if (audioStream) {
+        audioStream.getTracks().forEach(t => t.stop());
+        audioStream = null;
     }
     stopVoiceCaptureUI();
 }
@@ -531,7 +628,6 @@ document.addEventListener('DOMContentLoaded', () => {
             document.querySelectorAll('#archetypeChips .chip').forEach(c => c.classList.remove('active'));
             btn.classList.add('active');
             currentConfig.archetype = btn.dataset.archetype;
-            document.getElementById('activeArchetypeLabel').textContent = btn.textContent;
             sendConfig();
         });
     });
@@ -542,7 +638,6 @@ document.addEventListener('DOMContentLoaded', () => {
             document.querySelectorAll('#attitudeChips .chip').forEach(c => c.classList.remove('active'));
             btn.classList.add('active');
             currentConfig.attitude = btn.dataset.attitude;
-            document.getElementById('activeAttitudeLabel').textContent = btn.textContent;
             sendConfig();
         });
     });
