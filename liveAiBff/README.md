@@ -1,199 +1,221 @@
 # Live AI BFF - 3D Avatar & Lip-Sync Integration Guide
 
-Real-time interaction engine for the AI BFF stage play. This service orchestrates speech-to-text input, dynamic persona generation via Groq LLM, and ElevenLabs expressive voice synthesis (`eleven_v4`) with word-level alignment timestamps for driving real-time 3D facial animation, lip-sync, and subtitles.
+Real-time interaction engine for the AI BFF stage play. This service orchestrates speech-to-text input, dynamic persona generation via Groq LLM, and ElevenLabs expressive voice synthesis (`eleven_v4`) with word-level alignment timestamps for driving real-time 3D facial animation, lip-sync, and stage audio playback.
 
 ---
 
 ## 1. Quick Start & Setup
 
 ### Prerequisites
-- Python 3.10+ (tested on Python 3.11 / 3.12 / 3.13)
-- API Keys for Groq Cloud and ElevenLabs
+- Python 3.10+
+- Groq Cloud API Key & ElevenLabs API Key
 
-### Setup Instructions
+### Installation & Startup
+```bash
+git clone git@github.com:nasif43/ai-bff.git
+cd ai-bff/liveAiBff
+cp .env.example .env
+# Edit .env and supply your keys:
+# GROQ_API_KEY=gsk_...
+# ELEVENLABS_API_KEY=sk_...
+chmod +x run.sh
+./run.sh
+```
 
-1. **Clone the repository and enter directory:**
-   ```bash
-   git clone git@github.com:nasif43/ai-bff.git
-   cd ai-bff/liveAiBff
-   ```
-
-2. **Configure Environment Keys:**
-   Create a `.env` file from the provided template:
-   ```bash
-   cp .env.example .env
-   ```
-   Open `.env` in your editor and insert the API keys:
-   ```env
-   GROQ_API_KEY=gsk_...
-   ELEVENLABS_API_KEY=sk_...
-   PORT=8080
-   ```
-
-3. **Install Dependencies & Start the Server:**
-   Using the automatic startup script (creates `venv` and installs packages automatically):
-   ```bash
-   chmod +x run.sh
-   ./run.sh
-   ```
-   *Or manually via pip:*
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate
-   pip install -r requirements.txt
-   python3 server.py
-   ```
-
-The server binds to `0.0.0.0:8080`.
-- **Web Controller UI:** `http://localhost:8080` (or `http://<LAN_IP>:8080` on mobile)
-- **WebSocket Endpoint:** `ws://<HOST>:8080/ws`
-- **Audio Asset Delivery:** `http://<HOST>:8080/audio/<filename>.mp3`
+The server automatically starts a secure Cloudflare Tunnel:
+- **Phone Controller UI:** `https://<tunnel-id>.trycloudflare.com` (or `http://localhost:8080`)
+- **Stage 3D Client WebSocket:** `ws://localhost:8080/ws` (or `wss://<tunnel-id>.trycloudflare.com/ws`)
+- **Audio Asset Delivery:** `http://localhost:8080/audio/<filename>.mp3`
 
 ---
 
 ## 2. WebSocket Protocol (`/ws`)
 
-Connect any client (Three.js, Unity, Unreal, Godot, or Web) to `ws://<HOST>:8080/ws`. All connected clients receive broadcasts simultaneously.
+Connect your 3D visualizer, avatar engine (Three.js, Unity, Unreal, Godot), or stage audio client to the WebSocket endpoint. All connected clients receive event broadcasts simultaneously.
 
-### A. Client to Server Messages
-
-#### 1. Configure Persona & Voice
-Change the active archetype, attitude modifier, and voice profile at any time:
-```json
-{
-  "action": "set_config",
-  "archetype": "Trickster",
-  "attitude": "ChronicallyOnline",
-  "gender": "M"
-}
-```
-- **`archetype`**: `"DarkSoul"` | `"Trickster"` | `"Soother"`
-- **`attitude`**: `"Delulu"` | `"ChronicallyOnline"` | `"VillainEra"` | `"Unbothered"`
-- **`gender`**: `"M"` | `"F"`
-
-#### 2. Send Spoken / Text Input
-Trigger a live response turn:
-```json
-{
-  "text": "Hey bestie, I think I failed my exam."
-}
-```
-
-#### 3. Interrupt / Stop Playback
-Immediately stops current speech and signals all visualizers:
-```json
-{
-  "action": "stop_audio"
-}
-```
-
-#### 4. Reset Conversation Memory
-Clears chat context:
-```json
-{
-  "action": "reset_context"
-}
-```
-
----
-
-### B. Server to Client Events
+### A. Server Broadcast Events
 
 #### 1. Turn Complete (`turn_complete`)
-Dispatched immediately when LLM generation and voice synthesis are complete. Contains full lip-sync alignment and facial emotion tags.
+Dispatched immediately when speech generation and voice synthesis are complete. Contains full lip-sync alignment, audio URL, and facial emotion tags.
 
 ```json
 {
   "event": "turn_complete",
-  "user_text": "Hey bestie, I think I failed my exam.",
-  "text": "Bro, you didn't fail, you just achieved peak skibidi status and unlocked the 'L' achievement no cap.",
+  "user_text": "Yo bro, is this live?",
+  "text": "Yes, Shihab, you are bleeding real-time into the void, but do not panic.",
   "emotion": "smirk",
-  "audio_url": "/audio/turn_1793691526134.mp3",
+  "audio_url": "/audio/turn_1793692850658.mp3",
   "duration": 4.82,
+  "audio_route": "both",
   "timestamps": [
-    {"word": "Bro,", "start": 0.0, "end": 0.42},
-    {"word": "you", "start": 0.42, "end": 0.58},
-    {"word": "didn't", "start": 0.58, "end": 0.86},
-    {"word": "fail,", "start": 0.86, "end": 1.34},
-    {"word": "you", "start": 1.34, "end": 1.48},
-    {"word": "just", "start": 1.48, "end": 1.72},
-    {"word": "achieved", "start": 1.72, "end": 2.15}
+    {"word": "Yes,", "start": 0.0, "end": 0.42},
+    {"word": "Shihab,", "start": 0.42, "end": 1.15},
+    {"word": "you", "start": 1.15, "end": 1.30},
+    {"word": "are", "start": 1.30, "end": 1.48},
+    {"word": "bleeding", "start": 1.48, "end": 1.95},
+    {"word": "real-time", "start": 1.95, "end": 2.45},
+    {"word": "into", "start": 2.45, "end": 2.70},
+    {"word": "the", "start": 2.70, "end": 2.85},
+    {"word": "void,", "start": 2.85, "end": 3.40}
   ],
-  "archetype": "Trickster",
-  "attitude": "ChronicallyOnline",
+  "archetype": "DarkSoul",
+  "attitude": "Delulu",
   "gender": "M"
 }
 ```
 
+##### Field Reference:
+- **`text`**: Spoken dialogue line (cleaned of stage directions/asterisks).
+- **`audio_url`**: Relative path to the synthesized MP3 audio file.
+- **`timestamps`**: Array of word objects with exact `start` and `end` times in seconds relative to the audio file.
+- **`duration`**: Total duration of the audio in seconds.
+- **`emotion`**: Dominant facial expression tag for this turn (`smirk`, `delusional`, `villainous`, `comforting`, `unbothered`, `sarcastic`, `alarmed`, `neutral`).
+- **`audio_route`**: Selected audio output destination:
+  - `"screen"`: Audio should play **only through the stage screen / sound system** (phone is muted).
+  - `"both"`: Audio plays through both the phone and stage screen speakers.
+  - `"phone"`: Audio plays only on the actor's phone (screen muted).
+
 #### 2. Pipeline Status (`status`)
-Sent during intermediary processing phases:
+Broadcast during intermediate processing steps:
 ```json
 { "event": "status", "state": "generating_llm", "user_text": "..." }
 { "event": "status", "state": "generating_tts", "text": "...", "emotion": "smirk" }
 ```
 
-#### 3. Audio Stop Notification (`audio_stopped`)
-Sent when an audio stop or interrupt is initiated:
+#### 3. Audio Stop / Interrupt (`audio_stopped`)
+Broadcast whenever a barge-in interrupt occurs:
 ```json
 { "event": "audio_stopped" }
 ```
+When this event arrives, stop screen audio playback immediately and reset avatar mouth blendshapes to 0.
 
 ---
 
-## 3. Lip-Sync & Viseme Synchronization Guide
+## 3. Screen / Stage 3D Client Implementation Template
 
-### Synchronizing Word Boundaries
-Each entry in `timestamps` contains exact start and end times in seconds relative to the audio file:
-```json
-{"word": "fail,", "start": 0.86, "end": 1.34}
-```
+Below is a complete, production-ready JavaScript client for the screen/stage animation machine:
 
-To drive lip-sync in your animation loop:
 ```javascript
-const audio = new Audio("http://localhost:8080" + payload.audio_url);
-audio.play();
+const WS_URL = "ws://localhost:8080/ws"; // or wss://<tunnel>.trycloudflare.com/ws
+const BASE_HTTP = "http://localhost:8080";
 
-function onAnimationFrame() {
-    const t = audio.currentTime;
-    
-    // Find active word
-    const activeWord = payload.timestamps.find(w => t >= w.start && t <= w.end);
-    if (activeWord) {
-        // Drive mouth flap / viseme targets based on active word / phonemes
-        avatar.setMouthOpen(0.65);
-    } else {
-        avatar.setMouthOpen(0.0);
-    }
-    
-    if (!audio.paused && !audio.ended) {
-        requestAnimationFrame(onAnimationFrame);
+let socket;
+let currentAudio = null;
+let currentTimestamps = [];
+let animFrameId = null;
+
+function connect() {
+    socket = new WebSocket(WS_URL);
+
+    socket.onopen = () => {
+        console.log("[Screen 3D] Connected to Live AI BFF Engine");
+    };
+
+    socket.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+
+        if (data.event === "turn_complete") {
+            handleAvatarTurn(data);
+        } else if (data.event === "audio_stopped") {
+            stopAvatarPlayback();
+        }
+    };
+
+    socket.onclose = () => {
+        console.warn("[Screen 3D] Disconnected. Reconnecting in 2s...");
+        setTimeout(connect, 2000);
+    };
+}
+
+function handleAvatarTurn(turn) {
+    // 1. Set character facial expression / blendshape from emotion tag
+    setAvatarEmotion(turn.emotion);
+
+    // 2. Play audio through stage speakers (if route is 'screen' or 'both')
+    if (turn.audio_route === "screen" || turn.audio_route === "both") {
+        if (currentAudio) {
+            currentAudio.pause();
+        }
+
+        currentAudio = new Audio(BASE_HTTP + turn.audio_url);
+        currentAudio.volume = 1.0;
+        currentTimestamps = turn.timestamps || [];
+
+        currentAudio.play().then(() => {
+            cancelAnimationFrame(animFrameId);
+            runLipSyncLoop();
+        }).catch(err => {
+            console.error("Audio playback error:", err);
+        });
+
+        currentAudio.onended = () => {
+            stopAvatarPlayback();
+        };
     }
 }
-requestAnimationFrame(onAnimationFrame);
+
+function runLipSyncLoop() {
+    if (currentAudio && !currentAudio.paused && !currentAudio.ended) {
+        const currentTime = currentAudio.currentTime;
+
+        // Find active word at this exact millisecond
+        const activeWord = currentTimestamps.find(
+            w => currentTime >= w.start && currentTime <= w.end
+        );
+
+        if (activeWord) {
+            // Drive avatar mouth opening / viseme
+            // Replace with your 3D engine's morph target (e.g. avatar.morphTargetInfluences[jawOpenIndex] = 0.7)
+            setAvatarMouthOpen(0.75);
+        } else {
+            // Slight pause between words
+            setAvatarMouthOpen(0.05);
+        }
+
+        animFrameId = requestAnimationFrame(runLipSyncLoop);
+    } else {
+        setAvatarMouthOpen(0.0);
+    }
+}
+
+function stopAvatarPlayback() {
+    if (currentAudio) {
+        currentAudio.pause();
+        currentAudio = null;
+    }
+    cancelAnimationFrame(animFrameId);
+    setAvatarMouthOpen(0.0);
+    resetAvatarEmotion();
+}
+
+// Stubs for your 3D engine (Three.js / Babylon / Unity WebGL)
+function setAvatarMouthOpen(value) {
+    // e.g., morphTargets['jawOpen'] = value;
+}
+
+function setAvatarEmotion(emotion) {
+    // e.g., apply blendshapes for 'smirk', 'villainous', 'comforting', etc.
+}
+
+function resetAvatarEmotion() {
+    // Reset to neutral resting pose
+}
+
+connect();
 ```
-
-### Emotion Tag Mapping
-The `emotion` field specifies the character's facial expression and postural demeanor for the turn:
-
-| Emotion Tag | Recommended Blendshapes / Facial Morphs |
-| :--- | :--- |
-| `smirk` | Asymmetric mouth corner raise, squinted eye, eyebrow arch |
-| `sarcastic` | Eyebrow raise, slight head tilt, smirk/scoff mouth shape |
-| `comforting` | Soft smile, relaxed eyelids, head tilt, warm gaze |
-| `delusional` | Wide eyes, intense arched brows, wide eager smile |
-| `villainous` | Brow furrow (corrugator), narrowed eyelids, sinister grin |
-| `unbothered` | Half-closed eyelids, flat neutral mouth, slack posture |
-| `dramatic` | Wide eyes, dropped jaw, high raised brows |
-| `alarmed` | Dilated pupils, wide eyes, raised brows, mouth open |
-| `neutral` | Default relaxed resting expression |
 
 ---
 
-## 4. Architecture & Configuration Reference
+## 4. Emotion to Blendshape Mapping Reference
 
-- **`config.py`**: API keys, network host/port, ElevenLabs voice profile configurations, and archetype voice mappings.
-- **`prompts.py`**: Persona matrix (3 Archetypes $\times$ 4 Attitudes) and stage dialogue formatting rules.
-- **`groq_engine.py`**: Handles fast Groq inference (`qwen/qwen3.8-27b` with sub-second latency), emotion tag parsing, and regex sanitization of stage text.
-- **`tts_engine.py`**: Interfaces with ElevenLabs `with-timestamps` API (`eleven_v4`) and calculates word-level alignment arrays.
-- **`server.py`**: Asynchronous `aiohttp` WebSocket server broadcasting turns and serving static and audio assets.
-- **`static/`**: Mobile controller web client with Web Speech API input, archetype selectors, and karaoke subtitle synchronization.
+| Emotion Tag | Recommended Blendshapes / Morphs | Character Attitude |
+| :--- | :--- | :--- |
+| `smirk` | `mouthSmileLeft` (0.8), `eyeSquintLeft` (0.5), `browInnerUp` (0.3) | Cynical, teasing |
+| `sarcastic` | `browOuterUpRight` (0.7), `mouthPucker` (0.4), `headTilt` (0.3) | Mocking, deadpan |
+| `comforting` | `mouthSmile` (0.5), `browInnerUp` (0.4), `eyeWide` (0.2) | Warm, gentle, reassuring |
+| `delusional` | `eyeWide` (0.9), `browInnerUp` (0.7), `mouthSmile` (0.8) | High energy, wide-eyed denial |
+| `villainous` | `browDownLeft` (0.9), `browDownRight` (0.9), `mouthFrown` (0.5) | Petty revenge, menacing |
+| `unbothered` | `eyeSquint` (0.7), `mouthFlat` (0.6), `browDown` (0.2) | Low energy, deadpan, stoic |
+| `dramatic` | `eyeWide` (1.0), `jawOpen` (0.6), `browInnerUp` (0.9) | Over-the-top shock |
+| `alarmed` | `eyeWide` (1.0), `jawOpen` (0.8), `browInnerUp` (0.8) | Panicked, defensive |
+| `neutral` | Resting pose (all morphs at 0.0) | Default |

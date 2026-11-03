@@ -148,6 +148,7 @@ async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
         "archetype": "DarkSoul",
         "attitude": "Delulu",
         "gender": "M",
+        "audio_route": "both",
         "history": [],
     }
     print(f"[WS] Client connected. Total active: {len(connected_clients)}")
@@ -181,9 +182,12 @@ async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
                         connected_clients[ws]["attitude"] = data["attitude"]
                     if "gender" in data and data["gender"] in VALID_GENDERS:
                         connected_clients[ws]["gender"] = data["gender"]
+                    if "audio_route" in data:
+                        connected_clients[ws]["audio_route"] = data["audio_route"]
 
                     print(f"[WS] Config updated: {connected_clients[ws]['archetype']} x "
-                          f"{connected_clients[ws]['attitude']} ({connected_clients[ws]['gender']})")
+                          f"{connected_clients[ws]['attitude']} ({connected_clients[ws]['gender']}) "
+                          f"[route: {connected_clients[ws]['audio_route']}]")
 
                     await ws.send_str(json.dumps({
                         "event": "config_updated",
@@ -191,6 +195,7 @@ async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
                             "archetype": connected_clients[ws]["archetype"],
                             "attitude": connected_clients[ws]["attitude"],
                             "gender": connected_clients[ws]["gender"],
+                            "audio_route": connected_clients[ws]["audio_route"],
                         }
                     }))
                     continue
@@ -281,6 +286,7 @@ async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
                     "archetype": arch,
                     "attitude": att,
                     "gender": gender,
+                    "audio_route": client_state.get("audio_route", "both"),
                 }
 
                 await broadcast(turn_payload)
