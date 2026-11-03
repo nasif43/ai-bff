@@ -121,3 +121,21 @@ class GroqEngine:
         # Fallback response if all API calls failed
         fallback_text = "I heard you, but my network glitched for a second. Say that again."
         return fallback_text, "alarmed"
+
+    def transcribe_audio(self, audio_bytes: bytes, filename: str = "audio.webm") -> str:
+        """
+        Transcribes audio bytes using Groq Whisper.
+        """
+        stt_url = "https://api.groq.com/openai/v1/audio/transcriptions"
+        headers = {"Authorization": f"Bearer {self.api_key}"}
+        files = {"file": (filename, audio_bytes, "audio/webm")}
+        data = {"model": "whisper-large-v3-turbo"}
+        try:
+            res = requests.post(stt_url, headers=headers, files=files, data=data, timeout=10)
+            if res.status_code == 200:
+                return res.json().get("text", "").strip()
+            print(f"[GroqEngine] STT error {res.status_code}: {res.text}")
+        except Exception as e:
+            print(f"[GroqEngine] STT exception: {e}")
+        return ""
+

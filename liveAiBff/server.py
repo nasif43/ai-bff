@@ -239,10 +239,28 @@ async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
 async def index_handler(request: web.Request):
     return web.FileResponse(os.path.join(STATIC_DIR, "index.html"))
 
+async def stt_handler(request: web.Request) -> web.Response:
+    """Handles audio file uploads for Groq Whisper STT fallback."""
+    try:
+        reader = await request.multipart()
+        field = await reader.next()
+        if field and field.name == "audio":
+            audio_bytes = await field.read()
+            loop = asyncio.get_event_loop()
+            transcription = await loop.run_in_executor(
+                None, groq_engine.transcribe_audio, audio_bytes, "recording.webm"
+            )
+            return web.json_response({"text": transcription})
+        return web.json_response({"error": "No audio field provided"}, status=400)
+    except Exception as e:
+        print(f"[STT] Exception: {e}")
+        return web.json_response({"error": str(e)}, status=500)
+
 def create_app() -> web.Application:
     app = web.Application()
     app.router.add_get("/", index_handler)
     app.router.add_get("/ws", websocket_handler)
+    app.router.add_post("/api/stt", stt_handler)
     app.router.add_static("/static", STATIC_DIR, show_index=False)
     app.router.add_static("/audio", AUDIO_DIR, show_index=False)
     return app

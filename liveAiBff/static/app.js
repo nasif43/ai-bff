@@ -1,10 +1,13 @@
 // AI BFF Live Stage Controller - Client Application
 let ws = null;
-let recognition = null;
-let isRecording = null;
+let webSpeechRecognition = null;
+let mediaRecorder = null;
+let audioChunks = [];
+let isRecording = false;
 let currentTimestamps = [];
 let wordElements = [];
 let animFrameId = null;
+let audioUnlocked = false;
 
 // State configuration
 let currentConfig = {
@@ -18,13 +21,30 @@ const statusDot = document.getElementById('statusDot');
 const statusText = document.getElementById('statusText');
 const activeSpeaker = document.getElementById('activeSpeaker');
 const activeEmotion = document.getElementById('activeEmotion');
+const userBubble = document.getElementById('userBubble');
 const karaokeContainer = document.getElementById('karaokeContainer');
 const audioPlayer = document.getElementById('audioPlayer');
 const micBtn = document.getElementById('micBtn');
+const micLabel = document.getElementById('micLabel');
 const stopBtn = document.getElementById('stopBtn');
 const resetBtn = document.getElementById('resetBtn');
-const textForm = document.getElementById('textForm');
 const textInput = document.getElementById('textInput');
+const sendBtn = document.getElementById('sendBtn');
+
+// Unlock audio on first user touch/click anywhere
+function unlockAudio() {
+    if (audioUnlocked) return;
+    audioPlayer.play().then(() => {
+        audioPlayer.pause();
+        audioPlayer.currentTime = 0;
+        audioUnlocked = true;
+        console.log('[Audio] Unlocked successfully');
+    }).catch(() => {
+        // Expected if no audio loaded yet, marks intent
+    });
+}
+document.addEventListener('click', unlockAudio, { once: false });
+document.addEventListener('touchstart', unlockAudio, { once: false });
 
 // Initialize WebSockets
 function initWebSocket() {
@@ -36,17 +56,19 @@ function initWebSocket() {
     ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
-        updateStatus('Connected', 'connected');
+        console.log('[WS] Connected to server');
+        updateStatus('Connected & Ready', 'connected');
         sendConfig();
     };
 
     ws.onclose = () => {
-        updateStatus('Disconnected (Reconnecting...)', 'error');
+        console.warn('[WS] Closed. Reconnecting in 2s...');
+        updateStatus('Reconnecting...', 'error');
         setTimeout(initWebSocket, 2000);
     };
 
     ws.onerror = (err) => {
-        console.error('WebSocket Error:', err);
+        console.error('[WS] Error:', err);
         updateStatus('Connection Error', 'error');
     };
 
@@ -74,18 +96,17 @@ function sendConfig() {
     }
 }
 
-// Handle WebSocket Events
+// Handle WebSocket Events from Server
 function handleServerEvent(data) {
     switch (data.event) {
         case 'connected':
         case 'config_updated':
-            console.log('Config synchronized:', data);
+            console.log('[WS] Synchronized config:', data);
             break;
 
         case 'status':
             if (data.state === 'generating_llm') {
                 updateStatus('BFF Thinking...', 'busy');
-                renderUserDialogue(data.user_text);
             } else if (data.state === 'generating_tts') {
                 updateStatus('Synthesizing Voice...', 'busy');
                 setEmotionBadge(data.emotion);
@@ -93,7 +114,7 @@ function handleServerEvent(data) {
             break;
 
         case 'turn_complete':
-            updateStatus('Speaking', 'connected');
+            updateStatus('Speaking...', 'connected');
             playTurn(data);
             break;
 
@@ -103,34 +124,35 @@ function handleServerEvent(data) {
             break;
 
         case 'context_reset':
-            karaokeContainer.innerHTML = 'Conversation memory reset. Ready.';
-            setEmotionBadge('ready');
+            karaokeContainer.innerHTML = 'Conversation memory reset. Ready for next turn.';
+            userBubble.style.display = 'none';
+            setEmotionBadge('READY');
             updateStatus('Ready', 'connected');
             break;
 
         case 'error':
             alert('Server Error: ' + data.message);
-            updateStatus('Error', 'error');
+            updateStatus('Ready', 'connected');
             break;
     }
 }
 
-function renderUserDialogue(userText) {
-    activeSpeaker.textContent = 'Shihab';
-    activeEmotion.textContent = 'live';
-    activeEmotion.className = 'emotion-badge';
-    karaokeContainer.innerHTML = `<span style="color: #8b949e;">"${userText}"</span>`;
+function renderUserDialogue(text) {
+    userBubble.style.display = 'block';
+    userBubble.textContent = `You: "${text}"`;
+    activeSpeaker.textContent = `AI BFF (${currentConfig.archetype})`;
+    karaokeContainer.innerHTML = '<span style="color: #6b7280; font-style: italic;">Thinking of response...</span>';
 }
 
 function setEmotionBadge(emotion) {
     if (!emotion) emotion = 'neutral';
-    activeEmotion.textContent = emotion;
-    activeEmotion.className = `emotion-badge ${emotion}`;
+    activeEmotion.textContent = emotion.toUpperCase();
+    activeEmotion.className = `emotion-badge ${emotion.toLowerCase()}`;
 }
 
 // Play Turn & Synchronize Karaoke Subtitles
 function playTurn(turn) {
-    activeSpeaker.textContent = `BFF (${turn.archetype})`;
+    activeSpeaker.textContent = `AI BFF (${turn.archetype})`;
     setEmotionBadge(turn.emotion);
 
     currentTimestamps = turn.timestamps || [];
@@ -138,7 +160,7 @@ function playTurn(turn) {
     wordElements = [];
 
     // Render word spans
-    currentTimestamps.forEach((t, idx) => {
+    currentTimestamps.forEach((t) => {
         const span = document.createElement('span');
         span.className = 'karaoke-word';
         span.textContent = t.word;
@@ -154,13 +176,32 @@ function playTurn(turn) {
 
     // Play Audio
     audioPlayer.src = turn.audio_url;
-    audioPlayer.play().catch(e => {
-        console.warn('Auto-play blocked or failed:', e);
-    });
-
-    // Start timestamp synchronization loop
-    cancelAnimationFrame(animFrameId);
-    syncKaraoke();
+    audioPlayer.currentTime = 0;
+    
+    const playPromise = audioPlayer.play();
+    if (playPromise !== undefined) {
+        playPromise.then(() => {
+            cancelAnimationFrame(animFrameId);
+            syncKaraoke();
+        }).catch(e => {
+            console.warn('Autoplay blocked by browser policy:', e);
+            // Render manual play button so user can click to hear
+            const playButton = document.createElement('button');
+            playButton.type = 'button';
+            playButton.className = 'pill-btn';
+            playButton.style.marginTop = '12px';
+            playButton.style.borderColor = 'var(--accent-cyan)';
+            playButton.style.color = 'var(--accent-cyan)';
+            playButton.innerHTML = '▶ Click to Listen';
+            playButton.onclick = () => {
+                audioPlayer.play();
+                playButton.remove();
+                syncKaraoke();
+            };
+            karaokeContainer.appendChild(document.createElement('br'));
+            karaokeContainer.appendChild(playButton);
+        });
+    }
 }
 
 function syncKaraoke() {
@@ -195,80 +236,168 @@ function stopPlayback() {
     wordElements.forEach(el => el.classList.remove('active'));
 }
 
-// Speech Recognition (Web Speech API)
-function setupSpeechRecognition() {
-    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRec) {
-        console.warn('Web Speech API not supported on this browser.');
+// Send user message turn to server
+function sendUserSpeech(text) {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+        alert('Connecting to server... Please wait a moment and try again.');
         return;
     }
 
-    recognition = new SpeechRec();
-    recognition.continuous = false;
-    recognition.interimResults = false;
-    recognition.lang = 'en-US';
-
-    recognition.onstart = () => {
-        isRecording = true;
-        micBtn.classList.add('recording');
-        updateStatus('Listening to you...', 'busy');
-    };
-
-    recognition.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        if (transcript.trim()) {
-            sendUserSpeech(transcript.trim());
-        }
-    };
-
-    recognition.onerror = (event) => {
-        console.warn('Speech recognition error:', event.error);
-        stopRecordingUI();
-        updateStatus('Ready', 'connected');
-    };
-
-    recognition.onend = () => {
-        stopRecordingUI();
-    };
+    renderUserDialogue(trimmed);
+    updateStatus('Thinking...', 'busy');
+    ws.send(JSON.stringify({ text: trimmed }));
 }
 
-function startRecording() {
-    if (!recognition) setupSpeechRecognition();
-    if (!recognition) {
-        alert('Speech recognition is not supported in this browser. Please use Chrome, Edge, or Safari.');
+function handleSend() {
+    const val = textInput.value;
+    if (val && val.trim()) {
+        sendUserSpeech(val);
+        textInput.value = '';
+    }
+}
+
+// ----------------------------------------------------
+// DUAL-ENGINE MICROPHONE (WebSpeech + MediaRecorder + Whisper)
+// ----------------------------------------------------
+
+async function toggleRecording() {
+    unlockAudio();
+    if (isRecording) {
+        stopRecording();
+    } else {
+        startRecording();
+    }
+}
+
+async function startRecording() {
+    // Strategy A: Web Speech API
+    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRec) {
+        try {
+            webSpeechRecognition = new SpeechRec();
+            webSpeechRecognition.continuous = false;
+            webSpeechRecognition.interimResults = false;
+            webSpeechRecognition.lang = 'en-US';
+
+            webSpeechRecognition.onstart = () => {
+                setRecordingState(true);
+            };
+
+            webSpeechRecognition.onresult = (event) => {
+                const transcript = event.results[0][0].transcript;
+                if (transcript && transcript.trim()) {
+                    sendUserSpeech(transcript.trim());
+                }
+            };
+
+            webSpeechRecognition.onerror = (event) => {
+                console.warn('[WebSpeech] error:', event.error);
+                // Fall back to MediaRecorder
+                startMediaRecorder();
+            };
+
+            webSpeechRecognition.onend = () => {
+                setRecordingState(false);
+            };
+
+            webSpeechRecognition.start();
+            return;
+        } catch (e) {
+            console.warn('[WebSpeech] exception, trying MediaRecorder:', e);
+        }
+    }
+
+    // Strategy B: MediaRecorder audio capture with Groq Whisper transcription
+    startMediaRecorder();
+}
+
+async function startMediaRecorder() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        showMicUnavailableAlert();
         return;
     }
+
     try {
-        recognition.start();
-    } catch (e) {
-        console.warn('Error starting speech:', e);
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioChunks = [];
+        mediaRecorder = new MediaRecorder(stream);
+
+        mediaRecorder.ondataavailable = (e) => {
+            if (e.data && e.data.size > 0) audioChunks.push(e.data);
+        };
+
+        mediaRecorder.onstop = async () => {
+            stream.getTracks().forEach(t => t.stop());
+            if (audioChunks.length === 0) return;
+
+            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+            updateStatus('Transcribing speech (Whisper)...', 'busy');
+
+            const formData = new FormData();
+            formData.append('audio', audioBlob, 'recording.webm');
+
+            try {
+                const res = await fetch('/api/stt', { method: 'POST', body: formData });
+                const json = await res.json();
+                if (json.text && json.text.trim()) {
+                    sendUserSpeech(json.text.trim());
+                } else {
+                    updateStatus('No words detected. Try again.', 'connected');
+                }
+            } catch (err) {
+                console.error('STT upload error:', err);
+                updateStatus('STT Error', 'error');
+            }
+        };
+
+        mediaRecorder.start();
+        setRecordingState(true);
+    } catch (err) {
+        console.error('Microphone error:', err);
+        setRecordingState(false);
+        showMicUnavailableAlert();
     }
 }
 
 function stopRecording() {
-    if (recognition && isRecording) {
-        recognition.stop();
+    if (webSpeechRecognition) {
+        try { webSpeechRecognition.stop(); } catch(e){}
     }
-    stopRecordingUI();
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        try { mediaRecorder.stop(); } catch(e){}
+    }
+    setRecordingState(false);
 }
 
-function stopRecordingUI() {
-    isRecording = false;
-    micBtn.classList.remove('recording');
-}
-
-function sendUserSpeech(text) {
-    if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ text }));
+function setRecordingState(recording) {
+    isRecording = recording;
+    if (recording) {
+        micBtn.classList.add('recording');
+        micLabel.textContent = 'LISTENING... TAP TO STOP';
+        updateStatus('Listening... (Tap to finish)', 'busy');
+    } else {
+        micBtn.classList.remove('recording');
+        micLabel.textContent = 'TAP TO SPEAK';
     }
 }
 
-// Event Listeners for Chips & Controls
+function showMicUnavailableAlert() {
+    alert(
+        'Microphone is blocked or unavailable on this browser origin.\n\n' +
+        'Tip: Use the Quick Test chips or type in the message bar below!'
+    );
+}
+
+// ----------------------------------------------------
+// UI EVENT LISTENERS
+// ----------------------------------------------------
 document.addEventListener('DOMContentLoaded', () => {
     initWebSocket();
-    setupSpeechRecognition();
 
-    // Archetype selection
+    // Archetype selection chips
     document.querySelectorAll('#archetypeChips .chip').forEach(btn => {
         btn.addEventListener('click', () => {
             document.querySelectorAll('#archetypeChips .chip').forEach(c => c.classList.remove('active'));
@@ -278,7 +407,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // Attitude selection
+    // Attitude selection chips
     document.querySelectorAll('#attitudeChips .chip').forEach(btn => {
         btn.addEventListener('click', () => {
             document.querySelectorAll('#attitudeChips .chip').forEach(c => c.classList.remove('active'));
@@ -288,7 +417,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // Gender selection
+    // Gender selection chips
     document.querySelectorAll('#genderChips .chip').forEach(btn => {
         btn.addEventListener('click', () => {
             document.querySelectorAll('#genderChips .chip').forEach(c => c.classList.remove('active'));
@@ -298,16 +427,19 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // Mic interaction (both tap and hold)
-    micBtn.addEventListener('click', () => {
-        if (isRecording) {
-            stopRecording();
-        } else {
-            startRecording();
-        }
+    // Quick Prompts chips
+    document.querySelectorAll('.quick-chip').forEach(btn => {
+        btn.addEventListener('click', () => {
+            unlockAudio();
+            const promptText = btn.dataset.prompt;
+            if (promptText) sendUserSpeech(promptText);
+        });
     });
 
-    // Stop audio
+    // Mic button
+    micBtn.addEventListener('click', toggleRecording);
+
+    // Stop button
     stopBtn.addEventListener('click', () => {
         if (ws && ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({ action: 'stop_audio' }));
@@ -315,7 +447,7 @@ document.addEventListener('DOMContentLoaded', () => {
         stopPlayback();
     });
 
-    // Reset memory
+    // Reset button
     resetBtn.addEventListener('click', () => {
         if (confirm('Clear AI BFF conversation memory?')) {
             if (ws && ws.readyState === WebSocket.OPEN) {
@@ -324,13 +456,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Text form submission
-    textForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const val = textInput.value.trim();
-        if (val) {
-            sendUserSpeech(val);
-            textInput.value = '';
+    // Send button click
+    sendBtn.addEventListener('click', () => {
+        unlockAudio();
+        handleSend();
+    });
+
+    // Enter key on textInput
+    textInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            unlockAudio();
+            handleSend();
         }
     });
 });

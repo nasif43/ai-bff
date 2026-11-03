@@ -25,9 +25,9 @@
             <div class="selector-group">
                 <label class="group-label">Archetype</label>
                 <div class="chip-row" id="archetypeChips">
-                    <button class="chip active" data-archetype="DarkSoul">Dark Soul</button>
-                    <button class="chip" data-archetype="Trickster">Trickster</button>
-                    <button class="chip" data-archetype="Soother">Soother</button>
+                    <button type="button" class="chip active" data-archetype="DarkSoul">Dark Soul</button>
+                    <button type="button" class="chip" data-archetype="Trickster">Trickster</button>
+                    <button type="button" class="chip" data-archetype="Soother">Soother</button>
                 </div>
             </div>
 
@@ -35,19 +35,19 @@
             <div class="selector-group">
                 <label class="group-label">Personality Modifier</label>
                 <div class="chip-row" id="attitudeChips">
-                    <button class="chip active" data-attitude="Delulu">Delulu</button>
-                    <button class="chip" data-attitude="ChronicallyOnline">Online</button>
-                    <button class="chip" data-attitude="VillainEra">Villain Era</button>
-                    <button class="chip" data-attitude="Unbothered">Unbothered</button>
+                    <button type="button" class="chip active" data-attitude="Delulu">Delulu</button>
+                    <button type="button" class="chip" data-attitude="ChronicallyOnline">Online</button>
+                    <button type="button" class="chip" data-attitude="VillainEra">Villain Era</button>
+                    <button type="button" class="chip" data-attitude="Unbothered">Unbothered</button>
                 </div>
             </div>
 
             <!-- Voice Gender -->
             <div class="selector-group">
-                <label class="group-label">Voice</label>
+                <label class="group-label">Voice Gender</label>
                 <div class="chip-row" id="genderChips">
-                    <button class="chip active" data-gender="M">M</button>
-                    <button class="chip" data-gender="F">F</button>
+                    <button type="button" class="chip active" data-gender="M">Male (M)</button>
+                    <button type="button" class="chip" data-gender="F">Female (F)</button>
                 </div>
             </div>
         </section>
@@ -57,10 +57,11 @@
             <div class="dialogue-card" id="activeCard">
                 <div class="card-meta">
                     <span class="speaker-tag" id="activeSpeaker">AI BFF</span>
-                    <span class="emotion-badge" id="activeEmotion">ready</span>
+                    <span class="emotion-badge" id="activeEmotion">READY</span>
                 </div>
+                <div class="user-bubble" id="userBubble" style="display: none;"></div>
                 <div class="karaoke-text" id="karaokeContainer">
-                    Tap the mic below and talk to start.
+                    Tap the mic below or type a message to start speaking.
                 </div>
             </div>
         </section>
@@ -68,25 +69,36 @@
         <!-- Hidden Audio Element -->
         <audio id="audioPlayer" preload="auto"></audio>
 
+        <!-- Quick Prompts -->
+        <div class="quick-prompts-container">
+            <span class="quick-label">QUICK TEST:</span>
+            <div class="quick-chips">
+                <button type="button" class="quick-chip" data-prompt="Bestie, I think I failed my exam today.">💀 Failed Exam</button>
+                <button type="button" class="quick-chip" data-prompt="Should I text my ex right now?">📱 Text Ex?</button>
+                <button type="button" class="quick-chip" data-prompt="Everyone at school is literally staring at me.">👀 People Staring</button>
+                <button type="button" class="quick-chip" data-prompt="I have zero motivation to do anything.">😴 No Motivation</button>
+            </div>
+        </div>
+
         <!-- Live Controls -->
         <footer class="app-footer">
             <div class="mic-container">
-                <button id="micBtn" class="mic-button" aria-label="Hold to talk or tap to speak">
+                <button type="button" id="micBtn" class="mic-button" aria-label="Tap to speak">
                     <svg class="mic-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
                         <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
                         <line x1="12" x2="12" y1="19" y2="22"/>
                     </svg>
-                    <span class="mic-label">HOLD OR TAP</span>
+                    <span class="mic-label" id="micLabel">TAP TO SPEAK</span>
                 </button>
-                <button id="stopBtn" class="pill-btn stop-audio-btn" title="Stop Audio">■ Stop</button>
+                <button type="button" id="stopBtn" class="pill-btn stop-audio-btn" title="Stop Audio">■ Stop</button>
             </div>
 
-            <!-- Manual input fallback -->
-            <form id="textForm" class="text-input-form" onsubmit="return false;">
-                <input type="text" id="textInput" placeholder="Type a message instead..." autocomplete="off">
-                <button type="submit" id="sendBtn" class="send-button">➤</button>
-            </form>
+            <!-- Manual input bar (Div container, no form submission blocking) -->
+            <div class="text-input-form">
+                <input type="text" id="textInput" placeholder="Type a message to your AI BFF..." autocomplete="off">
+                <button type="button" id="sendBtn" class="send-button" title="Send message">➤</button>
+            </div>
         </footer>
     </div>
 
