@@ -119,6 +119,18 @@ class TTSEngine:
                         word_start = start_times[i]
                     current_word += ch
 
+            # Save timestamps JSON file alongside MP3
+            json_filename = f"{turn_id}.json"
+            json_filepath = os.path.join(AUDIO_DIR, json_filename)
+            with open(json_filepath, "w") as f:
+                json.dump({
+                    "text": text,
+                    "duration": round(total_duration, 3),
+                    "timestamps": word_timestamps,
+                    "archetype": archetype,
+                    "gender": gender,
+                }, f, indent=2)
+
             return {
                 "audio_path": filepath,
                 "audio_url": f"/audio/{filename}",

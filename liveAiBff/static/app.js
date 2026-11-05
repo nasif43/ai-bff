@@ -202,37 +202,6 @@ async function playTurn(turn) {
         karaokeContainer.textContent = turn.text;
     }
 
-    // Audio Output Routing check: if Screen Only, suppress phone playback
-    if (currentConfig.audio_route === 'screen') {
-        console.log('[Audio] Screen Only mode: phone audio muted, playing on screen');
-        updateStatus('Speaking on Stage Screen...', 'connected');
-
-        const startTime = Date.now();
-        const durationSec = turn.duration || 3.0;
-
-        function syncMutedKaraoke() {
-            if (!isAiSpeaking) return;
-            const elapsed = (Date.now() - startTime) / 1000;
-            for (let i = 0; i < currentTimestamps.length; i++) {
-                const t = currentTimestamps[i];
-                const el = wordElements[i];
-                if (elapsed >= t.start && elapsed <= t.end + 0.05) {
-                    el.classList.add('active');
-                } else {
-                    el.classList.remove('active');
-                }
-            }
-            if (elapsed < durationSec) {
-                karaokeAnimFrame = requestAnimationFrame(syncMutedKaraoke);
-            } else {
-                onAudioPlaybackEnded();
-            }
-        }
-        cancelAnimationFrame(karaokeAnimFrame);
-        syncMutedKaraoke();
-        return;
-    }
-
     // Attempt 1: Web Audio API (Loudspeaker, zero-latency, bypasses iOS silent switch issues)
     const ctx = getAudioContext();
     try {
@@ -680,16 +649,6 @@ document.addEventListener('DOMContentLoaded', () => {
             document.querySelectorAll('#genderChips .chip').forEach(c => c.classList.remove('active'));
             btn.classList.add('active');
             currentConfig.gender = btn.dataset.gender;
-            sendConfig();
-        });
-    });
-
-    // Audio Route Chips (Both / Screen Only / Phone Only)
-    document.querySelectorAll('#audioRouteChips .chip').forEach(btn => {
-        btn.addEventListener('click', () => {
-            document.querySelectorAll('#audioRouteChips .chip').forEach(c => c.classList.remove('active'));
-            btn.classList.add('active');
-            currentConfig.audio_route = btn.dataset.route;
             sendConfig();
         });
     });

@@ -1,26 +1,36 @@
 #!/usr/bin/env python3
 """
-Master Audio Generator for all 12 AI BFF Script Versions.
-Uses eleven_v4 model with high emotional expressiveness.
-Automatically skips any file that already exists on disk.
+Master Audio & Timestamp Generator for ALL 24 AI BFF Script Versions (12 Combinations x Male/Female).
+Uses ElevenLabs eleven_v4 with-timestamps to save both:
+  - <filename>.mp3  (synthesized audio)
+  - <filename>.json (word-level alignment timestamps and duration)
+Automatically skips files that already exist on disk.
 """
 
 import os
 import re
 import json
 import time
+import base64
 import requests
 
 API_KEY = os.getenv("ELEVENLABS_API_KEY", "")
 if not API_KEY and os.path.exists("11labs_API_KEY.txt"):
     with open("11labs_API_KEY.txt", "r") as f:
         API_KEY = f.read().strip()
+
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+if not GROQ_API_KEY and os.path.exists("liveAiBff/.env"):
+    with open("liveAiBff/.env", "r") as f:
+        for line in f:
+            if line.startswith("GROQ_API_KEY="):
+                GROQ_API_KEY = line.split("=", 1)[1].strip().strip('"').strip("'")
+
 BASE_URL = "https://api.elevenlabs.io/v1"
 OUTPUT_DIR = "/home/muhts/dev/Codes/kat/ai-bff/audio"
 SCRIPT_PATH = "/home/muhts/dev/Codes/kat/ai-bff/script_raw.txt"
 MODEL = "eleven_v4"
 
-# Voice configurations:
 VOICE_PROFILES = {
     "Adam_Stone": {
         "voice_id": "auq43ws1oslv0tO4BDa7",
@@ -59,21 +69,45 @@ VOICE_PROFILES = {
     },
 }
 
-# The 12 Versions and their target folders and assigned voices
-VERSION_DIRECTORIES = [
-    # (version_number_in_script_sequence, folder_name, prefix, bff_voice_key, bff_gender)
-    (1,  "DarkSoul_Delulu_M",            "DarkSoul_Delulu",            "Adam_Stone", "M"),
-    (2,  "DarkSoul_ChronicallyOnline_M", "DarkSoul_ChronicallyOnline", "Liam",       "M"),
-    (3,  "DarkSoul_VillainEra_M",        "DarkSoul_VillainEra",        "Adam_Stone", "M"),
-    (4,  "DarkSoul_Unbothered_M",        "DarkSoul_Unbothered",        "Adam_Stone", "M"),
-    (5,  "Trickster_ChronicallyOnline",  "Trickster_ChronicallyOnline","Liam",       "M"),
-    (6,  "Trickster_Unbothered_M",       "Trickster_Unbothered",       "Liam",       "M"),
-    (7,  "Trickster_Delulu_M",           "Trickster_Delulu",           "Liam",       "M"),
-    (8,  "Trickster_VillainEra_M",       "Trickster_VillainEra",       "Liam",       "M"),
-    (9,  "Soother_VillainEra_F",         "Soother_VillainEra",         "Jessica",    "F"),
-    (10, "Soother_ChronicallyOnline_F",  "Soother_ChronicallyOnline",  "Jessica",    "F"),
-    (11, "Soother_Unbothered_M",         "Soother_Unbothered",         "Adam_Stone", "M"),
-    (12, "Soother_Delulu_F",             "Soother_Delulu",             "Jessica",    "F"),
+# Master List of all 24 script targets (12 Archetypes x 2 Genders)
+MASTER_VERSION_DIRECTORIES = [
+    # (section_num, folder_name, prefix, voice_key, bff_gender)
+    # 1. DarkSoul + Delulu
+    (1,  "DarkSoul_Delulu_M",             "DarkSoul_Delulu",            "Adam_Stone", "M"),
+    (1,  "DarkSoul_Delulu_F",             "DarkSoul_Delulu",            "Jessica",    "F"),
+    # 2. DarkSoul + ChronicallyOnline
+    (2,  "DarkSoul_ChronicallyOnline_M",  "DarkSoul_ChronicallyOnline", "Liam",       "M"),
+    (2,  "DarkSoul_ChronicallyOnline_F",  "DarkSoul_ChronicallyOnline", "Laura",      "F"),
+    # 3. DarkSoul + VillainEra
+    (3,  "DarkSoul_VillainEra_M",         "DarkSoul_VillainEra",        "Adam_Stone", "M"),
+    (3,  "DarkSoul_VillainEra_F",         "DarkSoul_VillainEra",        "Jessica",    "F"),
+    # 4. DarkSoul + Unbothered
+    (4,  "DarkSoul_Unbothered_M",         "DarkSoul_Unbothered",        "Adam_Stone", "M"),
+    (4,  "DarkSoul_Unbothered_F",         "DarkSoul_Unbothered",        "Jessica",    "F"),
+    # 5. Trickster + ChronicallyOnline
+    (5,  "Trickster_ChronicallyOnline",   "Trickster_ChronicallyOnline","Liam",       "M"),
+    (5,  "Trickster_ChronicallyOnline_F", "Trickster_ChronicallyOnline","Laura",      "F"),
+    # 6. Trickster + Unbothered
+    (6,  "Trickster_Unbothered_M",        "Trickster_Unbothered",       "Liam",       "M"),
+    (6,  "Trickster_Unbothered_F",        "Trickster_Unbothered",       "Laura",      "F"),
+    # 7. Trickster + Delulu
+    (7,  "Trickster_Delulu_M",            "Trickster_Delulu",           "Liam",       "M"),
+    (7,  "Trickster_Delulu_F",            "Trickster_Delulu",           "Laura",      "F"),
+    # 8. Trickster + VillainEra
+    (8,  "Trickster_VillainEra_M",        "Trickster_VillainEra",       "Liam",       "M"),
+    (8,  "Trickster_VillainEra_F",        "Trickster_VillainEra",       "Laura",      "F"),
+    # 9. Soother + VillainEra
+    (9,  "Soother_VillainEra_M",          "Soother_VillainEra",         "Adam_Stone", "M"),
+    (9,  "Soother_VillainEra_F",          "Soother_VillainEra",         "Jessica",    "F"),
+    # 10. Soother + ChronicallyOnline
+    (10, "Soother_ChronicallyOnline_M",   "Soother_ChronicallyOnline",  "Liam",       "M"),
+    (10, "Soother_ChronicallyOnline_F",   "Soother_ChronicallyOnline",  "Jessica",    "F"),
+    # 11. Soother + Unbothered
+    (11, "Soother_Unbothered_M",          "Soother_Unbothered",         "Adam_Stone", "M"),
+    (11, "Soother_Unbothered_F",          "Soother_Unbothered",         "Jessica",    "F"),
+    # 12. Soother + Delulu
+    (12, "Soother_Delulu_M",              "Soother_Delulu",             "Adam_Stone", "M"),
+    (12, "Soother_Delulu_F",              "Soother_Delulu",             "Jessica",    "F"),
 ]
 
 EMOJI_PATTERN = re.compile(
@@ -138,14 +172,14 @@ def build_file_mapping(prefix, bff_gender, bff_lines):
     # 21..25 -> Week 3 lines 21..25
     for i in range(21, 26):
         mapping.append((f"{prefix}_{bff_gender}_{i}.mp3", bff_lines[i][0], bff_lines[i][1]))
-    # 26 -> Vote 2 YES (as M, tagged _F)
+    # 26 -> Vote 2 YES (Crush line)
     mapping.append((f"{prefix}_F_26_Y.mp3", bff_lines[26][0], True))
     # 27 -> Vote 2 NO
     mapping.append((f"{prefix}_{bff_gender}_26_N.mp3", bff_lines[27][0], False))
     # 28, 29 -> Practice 27, 28
     mapping.append((f"{prefix}_{bff_gender}_27.mp3", bff_lines[28][0], False))
     mapping.append((f"{prefix}_{bff_gender}_28.mp3", bff_lines[29][0], False))
-    # 30, 31, 32 -> Practice as M 29, 30, 31 (tagged _F)
+    # 30, 31, 32 -> Practice as M 29, 30, 31 (Crush lines)
     mapping.append((f"{prefix}_F_29.mp3", bff_lines[30][0], True))
     mapping.append((f"{prefix}_F_30.mp3", bff_lines[31][0], True))
     mapping.append((f"{prefix}_F_31.mp3", bff_lines[32][0], True))
@@ -185,14 +219,41 @@ def build_file_mapping(prefix, bff_gender, bff_lines):
     
     return mapping
 
-def generate_audio(text, voice_cfg, out_path):
+def extract_word_timestamps(alignment):
+    chars = alignment.get("characters", [])
+    starts = alignment.get("character_start_times_seconds", [])
+    ends = alignment.get("character_end_times_seconds", [])
+    words = []
+    current_word = ""
+    w_start = None
+    for i, ch in enumerate(chars):
+        if ch.isspace() or i == len(chars) - 1:
+            if not ch.isspace():
+                current_word += ch
+            if current_word:
+                w_end = ends[i] if i < len(ends) else (starts[i] + 0.1 if i < len(starts) else 0.0)
+                words.append({
+                    "word": current_word,
+                    "start": round(w_start if w_start is not None else 0.0, 3),
+                    "end": round(w_end, 3)
+                })
+                current_word = ""
+                w_start = None
+        else:
+            if w_start is None and i < len(starts):
+                w_start = starts[i]
+            current_word += ch
+    total_dur = max(ends) if ends else 0.0
+    return words, round(total_dur, 3)
+
+def generate_with_elevenlabs(text, voice_cfg, out_mp3_path, out_json_path):
     clean = strip_emojis(text)
     if not clean.strip():
         return False
         
-    url = f"{BASE_URL}/text-to-speech/{voice_cfg['voice_id']}"
+    url = f"{BASE_URL}/text-to-speech/{voice_cfg['voice_id']}/with-timestamps"
     headers = {
-        "Accept": "audio/mpeg",
+        "Accept": "application/json",
         "Content-Type": "application/json",
         "xi-api-key": API_KEY,
     }
@@ -212,19 +273,65 @@ def generate_audio(text, voice_cfg, out_path):
         try:
             r = requests.post(url, headers=headers, json=payload, timeout=60)
             if r.status_code == 200:
-                with open(out_path, "wb") as f:
-                    f.write(r.content)
+                data = r.json()
+                audio_bytes = base64.b64decode(data.get("audio_base64", ""))
+                with open(out_mp3_path, "wb") as f:
+                    f.write(audio_bytes)
+                
+                alignment = data.get("alignment", {})
+                words, total_dur = extract_word_timestamps(alignment)
+                
+                with open(out_json_path, "w") as f:
+                    json.dump({
+                        "text": clean,
+                        "duration": total_dur,
+                        "timestamps": words
+                    }, f, indent=2)
                 return True
             elif r.status_code == 429:
                 wait = 20 * (attempt + 1)
-                print(f"    [RATE LIMIT] Waiting {wait}s...")
                 time.sleep(wait)
             else:
-                print(f"    [ERROR] HTTP {r.status_code}: {r.text[:120]}")
                 return False
-        except Exception as e:
-            print(f"    [EXCEPTION] {e}")
-            time.sleep(5)
+        except Exception:
+            time.sleep(4)
+    return False
+
+def generate_json_from_existing_mp3(mp3_path, out_json_path):
+    url = "https://api.groq.com/openai/v1/audio/transcriptions"
+    headers = {"Authorization": f"Bearer {GROQ_API_KEY}"}
+    for attempt in range(3):
+        try:
+            with open(mp3_path, "rb") as f:
+                files = {"file": (os.path.basename(mp3_path), f, "audio/mpeg")}
+                data = {
+                    "model": "whisper-large-v3",
+                    "response_format": "verbose_json",
+                    "timestamp_granularities[]": "word",
+                }
+                r = requests.post(url, headers=headers, files=files, data=data, timeout=30)
+                if r.status_code == 200:
+                    res = r.json()
+                    words = [
+                        {
+                            "word": w.get("word", "").strip(),
+                            "start": round(w.get("start", 0.0), 3),
+                            "end": round(w.get("end", 0.0), 3),
+                        }
+                        for w in res.get("words", [])
+                    ]
+                    payload = {
+                        "text": res.get("text", "").strip(),
+                        "duration": round(res.get("duration", 0.0), 3),
+                        "timestamps": words,
+                    }
+                    with open(out_json_path, "w") as out_f:
+                        json.dump(payload, out_f, indent=2)
+                    return True
+                elif r.status_code == 429:
+                    time.sleep(10)
+        except Exception:
+            time.sleep(3)
     return False
 
 def main():
@@ -233,53 +340,43 @@ def main():
         
     sections = extract_version_sections(script_text)
     
-    total_planned = 0
-    total_skipped = 0
-    total_generated = 0
-    total_failed = 0
+    print("=" * 70)
+    print("AI BFF MASTER AUDIO & TIMESTAMPS GENERATOR — ALL 24 VERSIONS")
+    print(f"Output Directory: {OUTPUT_DIR}")
+    print("=" * 70)
     
-    print("=" * 65)
-    print("AI BFF MASTER AUDIO GENERATOR — ALL 12 VERSIONS")
-    print(f"Model: {MODEL} | Output Directory: {OUTPUT_DIR}")
-    print("=" * 65)
-    
-    for v_num, folder_name, prefix, voice_key, bff_gender in VERSION_DIRECTORIES:
+    for v_num, folder_name, prefix, voice_key, bff_gender in MASTER_VERSION_DIRECTORIES:
         folder_path = os.path.join(OUTPUT_DIR, folder_name)
         os.makedirs(folder_path, exist_ok=True)
         
         bff_voice = VOICE_PROFILES[voice_key]
-        crush_voice = VOICE_PROFILES["Riley_Crush"]
+        riley_voice = VOICE_PROFILES["Riley_Crush"]
         
         section_text = sections[v_num]
         bff_lines = parse_section_lines(section_text)
         mapping = build_file_mapping(prefix, bff_gender, bff_lines)
         
-        print(f"\n[{v_num}/12] {folder_name} (Voice: {voice_key}, Gender: {bff_gender})")
-        print(f"     Target items: {len(mapping)} files")
+        print(f"\nProcessing: {folder_name} ({bff_gender}, {voice_key})")
         
-        for filename, text, is_as_m in mapping:
-            out_file = os.path.join(folder_path, filename)
-            voice_to_use = crush_voice if is_as_m else bff_voice
-            total_planned += 1
+        for idx, (filename, text, is_as_m) in enumerate(mapping, 1):
+            out_mp3 = os.path.join(folder_path, filename)
+            out_json = os.path.join(folder_path, filename.replace(".mp3", ".json"))
             
-            if os.path.exists(out_file) and os.path.getsize(out_file) > 1000:
-                total_skipped += 1
+            # Case 1: Both exist
+            if os.path.exists(out_mp3) and os.path.getsize(out_mp3) > 1000 and os.path.exists(out_json):
                 continue
                 
-            print(f"  -> Generating: {filename} {'[as M/Riley]' if is_as_m else ''}")
-            ok = generate_audio(text, voice_to_use, out_file)
-            if ok:
-                print(f"     [OK] {os.path.getsize(out_file)} bytes")
-                total_generated += 1
-            else:
-                print(f"     [FAIL] {filename}")
-                total_failed += 1
+            # Case 2: MP3 exists, JSON missing -> generate JSON alignment
+            if os.path.exists(out_mp3) and os.path.getsize(out_mp3) > 1000 and not os.path.exists(out_json):
+                print(f"  [{idx:02d}/71] Generating timestamps: {filename} -> {os.path.basename(out_json)}")
+                generate_json_from_existing_mp3(out_mp3, out_json)
+                continue
                 
-            time.sleep(1.2)
-            
-    print("\n" + "=" * 65)
-    print(f"SUMMARY: Planned: {total_planned} | Skipped: {total_skipped} | Generated: {total_generated} | Failed: {total_failed}")
-    print("=" * 65)
+            # Case 3: Need full generation (MP3 + JSON) via ElevenLabs
+            voice_cfg = riley_voice if is_as_m else bff_voice
+            print(f"  [{idx:02d}/71] ElevenLabs Generating: {filename}")
+            generate_with_elevenlabs(text, voice_cfg, out_mp3, out_json)
+            time.sleep(0.3)
 
 if __name__ == "__main__":
     main()
